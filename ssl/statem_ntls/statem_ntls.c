@@ -169,13 +169,16 @@ int SSL_connection_is_ntls(SSL *s, int is_server)
         }
 
         data = s->preread_buf + s->preread_len;
-
         clear_sys_error();
         s->rwstate = SSL_READING;
         ret = BIO_read(s->rbio, data, sizeof(s->preread_buf) - s->preread_len);
 
-        if (ret <= 0)
+        if (ret <= 0 && !BIO_should_retry(s->rbio) && BIO_eof(s->rbio)) {
+            SSLfatal(s, SSL_AD_DECODE_ERROR, SSL_F_SSL_CONNECTION_IS_NTLS,
+                     SSL_R_UNEXPECTED_MESSAGE);
+
             return -1;
+        }
 
         if (ret > 0)
             s->preread_len += ret;
