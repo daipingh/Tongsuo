@@ -204,6 +204,11 @@ int ossl_statem_client_read_transition_ntls(SSL *s, int mt)
             st->hand_state = TLS_ST_CR_CHANGE;
             return 1;
         }
+        // Just to support GmSSL based servers.
+        if (mt == SSL3_MT_NEWSESSION_TICKET) {
+            st->hand_state = TLS_ST_CR_SESSION_TICKET;
+            return 1;
+        }
         break;
 
     case TLS_ST_CR_SESSION_TICKET:
