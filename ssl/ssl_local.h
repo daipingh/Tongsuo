@@ -1220,6 +1220,7 @@ struct ssl_ctx_st {
     /* Tag of NTLS */
     int enable_ntls;
     int enable_force_ntls;
+    const SSL_METHOD *back_method;
 #endif
 #ifndef OPENSSL_NO_SM2
     /*
