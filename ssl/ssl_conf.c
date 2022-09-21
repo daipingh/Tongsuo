@@ -782,6 +782,52 @@ static int cmd_Enable_force_ntls(SSL_CONF_CTX *cctx, const char *value)
     }
     return 1;
 }
+
+static int cmd_Enable_ntls2(SSL_CONF_CTX *cctx, const char *value)
+{
+    if (strcmp(value, "on") == 0) {
+        if (cctx->ctx) {
+            cctx->ctx->enable_ntls = 1;
+            if (cctx->ctx->back_method) {
+                cctx->ctx->method = cctx->ctx->back_method;
+                cctx->ctx->back_method = NULL;
+            }
+        }
+    } else if (strcmp(value, "on:ntls_client_method") == 0) {
+        if (cctx->ctx) {
+            cctx->ctx->enable_ntls = 1;
+            if (!cctx->ctx->back_method) {
+                cctx->ctx->back_method = cctx->ctx->method;
+            }
+            cctx->ctx->method = ntls_client_method();
+        }
+    } else if (strcmp(value, "on:ntls_server_method") == 0) {
+        if (cctx->ctx) {
+            cctx->ctx->enable_ntls = 1;
+            if (!cctx->ctx->back_method) {
+                cctx->ctx->back_method = cctx->ctx->method;
+            }
+            cctx->ctx->method = ntls_server_method();
+        }
+    } else if (strcmp(value, "on:ntls_method") == 0) {
+        if (cctx->ctx) {
+            cctx->ctx->enable_ntls = 1;
+            if (!cctx->ctx->back_method) {
+                cctx->ctx->back_method = cctx->ctx->method;
+            }
+            cctx->ctx->method = ntls_method();
+        }
+    } else {
+        if (cctx->ctx) {
+            cctx->ctx->enable_ntls = 0;
+            if (cctx->ctx->back_method) {
+                cctx->ctx->method = cctx->ctx->back_method;
+                cctx->ctx->back_method = NULL;
+            }
+        }
+    }
+    return 1;
+}
 #endif
 
 #ifndef OPENSSL_NO_SM2
@@ -1001,6 +1047,7 @@ static const ssl_conf_cmd_tbl ssl_conf_cmds[] = {
 #ifndef OPENSSL_NO_NTLS
     SSL_CONF_CMD_STRING(Enable_ntls, "enable_ntls", 0),
     SSL_CONF_CMD_STRING(Enable_force_ntls, "enable_force_ntls", 0),
+    SSL_CONF_CMD_STRING(Enable_ntls2, "enable_ntls2", 0),
     SSL_CONF_CMD(EncCertificate, "enc_cert", SSL_CONF_FLAG_CERTIFICATE,
                  SSL_CONF_TYPE_FILE),
     SSL_CONF_CMD(EncPrivateKey, "enc_key", SSL_CONF_FLAG_CERTIFICATE,
