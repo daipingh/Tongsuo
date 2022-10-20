@@ -666,9 +666,6 @@ static void list_disabled(void)
 #ifdef OPENSSL_NO_BLAKE2
     BIO_puts(bio_out, "BLAKE2\n");
 #endif
-#ifdef OPENSSL_NO_CAMELLIA
-    BIO_puts(bio_out, "CAMELLIA\n");
-#endif
 #ifdef OPENSSL_NO_CAST
     BIO_puts(bio_out, "CAST\n");
 #endif
@@ -720,9 +717,6 @@ static void list_disabled(void)
 #ifdef OPENSSL_NO_IDEA
     BIO_puts(bio_out, "IDEA\n");
 #endif
-#ifdef OPENSSL_NO_MD2
-    BIO_puts(bio_out, "MD2\n");
-#endif
 #ifdef OPENSSL_NO_MD4
     BIO_puts(bio_out, "MD4\n");
 #endif
@@ -761,9 +755,6 @@ static void list_disabled(void)
 #endif
 #ifdef OPENSSL_NO_SCTP
     BIO_puts(bio_out, "SCTP\n");
-#endif
-#ifdef OPENSSL_NO_SEED
-    BIO_puts(bio_out, "SEED\n");
 #endif
 #ifdef OPENSSL_NO_SM2
     BIO_puts(bio_out, "SM2\n");

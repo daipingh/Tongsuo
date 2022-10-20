@@ -16,6 +16,7 @@
 #define ECDH_SECONDS    10
 #define EdDSA_SECONDS   10
 #define SM2_SECONDS     10
+#define EC_ELGAMAL_SECONDS      10
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,12 +43,6 @@
 # include <openssl/des.h>
 #endif
 #include <openssl/aes.h>
-#ifndef OPENSSL_NO_CAMELLIA
-# include <openssl/camellia.h>
-#endif
-#ifndef OPENSSL_NO_MD2
-# include <openssl/md2.h>
-#endif
 #ifndef OPENSSL_NO_MDC2
 # include <openssl/mdc2.h>
 #endif
@@ -76,9 +71,6 @@
 #endif
 #ifndef OPENSSL_NO_IDEA
 # include <openssl/idea.h>
-#endif
-#ifndef OPENSSL_NO_SEED
-# include <openssl/seed.h>
 #endif
 #ifndef OPENSSL_NO_BF
 # include <openssl/blowfish.h>
@@ -132,16 +124,13 @@ typedef struct openssl_speed_sec_st {
     int ecdh;
     int eddsa;
     int sm2;
+    int ec_elgamal;
 } openssl_speed_sec_t;
 
 static volatile int run = 0;
 
 static int mr = 0;
 static int usertime = 1;
-
-#ifndef OPENSSL_NO_MD2
-static int EVP_Digest_MD2_loop(void *args);
-#endif
 
 #ifndef OPENSSL_NO_MDC2
 static int EVP_Digest_MDC2_loop(void *args);
@@ -197,6 +186,11 @@ static int EdDSA_verify_loop(void *args);
 # ifndef OPENSSL_NO_SM2
 static int SM2_sign_loop(void *args);
 static int SM2_verify_loop(void *args);
+# endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+static int EC_ELGAMAL_loop(void *args);
+static void ec_elgamal_print_message(const char *str, const char *str2,
+                                     long num, int tm);
 # endif
 #endif
 
@@ -350,46 +344,40 @@ const OPTIONS speed_options[] = {
     {NULL}
 };
 
-#define D_MD2           0
-#define D_MDC2          1
-#define D_MD4           2
-#define D_MD5           3
-#define D_HMAC          4
-#define D_SHA1          5
-#define D_RMD160        6
-#define D_RC4           7
-#define D_CBC_DES       8
-#define D_EDE3_DES      9
-#define D_CBC_IDEA      10
-#define D_CBC_SEED      11
-#define D_CBC_RC2       12
-#define D_CBC_RC5       13
-#define D_CBC_BF        14
-#define D_CBC_CAST      15
-#define D_CBC_128_AES   16
-#define D_CBC_192_AES   17
-#define D_CBC_256_AES   18
-#define D_CBC_128_CML   19
-#define D_CBC_192_CML   20
-#define D_CBC_256_CML   21
-#define D_EVP           22
-#define D_SHA256        23
-#define D_SHA512        24
-#define D_WHIRLPOOL     25
-#define D_IGE_128_AES   26
-#define D_IGE_192_AES   27
-#define D_IGE_256_AES   28
-#define D_GHASH         29
-#define D_RAND          30
-#define D_SM3           31
-#define D_CBC_SM4       32
+#define D_MDC2          0
+#define D_MD4           1
+#define D_MD5           2
+#define D_HMAC          3
+#define D_SHA1          4
+#define D_RMD160        5
+#define D_RC4           6
+#define D_CBC_DES       7
+#define D_EDE3_DES      8
+#define D_CBC_IDEA      9
+#define D_CBC_RC2       10
+#define D_CBC_RC5       11
+#define D_CBC_BF        12
+#define D_CBC_CAST      13
+#define D_CBC_128_AES   14
+#define D_CBC_192_AES   15
+#define D_CBC_256_AES   16
+#define D_EVP           17
+#define D_SHA256        18
+#define D_SHA512        19
+#define D_WHIRLPOOL     20
+#define D_IGE_128_AES   21
+#define D_IGE_192_AES   22
+#define D_IGE_256_AES   23
+#define D_GHASH         24
+#define D_RAND          25
+#define D_SM3           26
+#define D_CBC_SM4       27
 /* name of algorithms to test */
 static const char *names[] = {
-    "md2", "mdc2", "md4", "md5", "hmac(md5)", "sha1", "rmd160", "rc4",
-    "des cbc", "des ede3", "idea cbc", "seed cbc",
+    "mdc2", "md4", "md5", "hmac(md5)", "sha1", "rmd160", "rc4",
+    "des cbc", "des ede3", "idea cbc",
     "rc2 cbc", "rc5-32/12 cbc", "blowfish cbc", "cast cbc",
     "aes-128 cbc", "aes-192 cbc", "aes-256 cbc",
-    "camellia-128 cbc", "camellia-192 cbc", "camellia-256 cbc",
     "evp", "sha256", "sha512", "whirlpool",
     "aes-128 ige", "aes-192 ige", "aes-256 ige", "ghash",
     "rand", "sm3", "sm4"
@@ -398,9 +386,6 @@ static const char *names[] = {
 
 /* list of configured algorithm (remaining) */
 static const OPT_PAIR doit_choices[] = {
-#ifndef OPENSSL_NO_MD2
-    {"md2", D_MD2},
-#endif
 #ifndef OPENSSL_NO_MDC2
     {"mdc2", D_MDC2},
 #endif
@@ -446,10 +431,6 @@ static const OPT_PAIR doit_choices[] = {
 #ifndef OPENSSL_NO_IDEA
     {"idea-cbc", D_CBC_IDEA},
     {"idea", D_CBC_IDEA},
-#endif
-#ifndef OPENSSL_NO_SEED
-    {"seed-cbc", D_CBC_SEED},
-    {"seed", D_CBC_SEED},
 #endif
 #ifndef OPENSSL_NO_BF
     {"bf-cbc", D_CBC_BF},
@@ -623,6 +604,77 @@ static OPT_PAIR sm2_choices[] = {
 
 static double sm2_results[SM2_NUM][2];    /* 2 ops: sign then verify */
 # endif /* OPENSSL_NO_SM2 */
+
+# ifndef OPENSSL_NO_EC_ELGAMAL
+enum {
+    R_EC_ELGAMAL_P160,
+    R_EC_ELGAMAL_P192,
+    R_EC_ELGAMAL_P224,
+    R_EC_ELGAMAL_P256,
+    R_EC_ELGAMAL_P384,
+    R_EC_ELGAMAL_P521,
+#  ifndef OPENSSL_NO_EC2M
+    R_EC_ELGAMAL_K163,
+    R_EC_ELGAMAL_K233,
+    R_EC_ELGAMAL_K283,
+    R_EC_ELGAMAL_K409,
+    R_EC_ELGAMAL_K571,
+    R_EC_ELGAMAL_B163,
+    R_EC_ELGAMAL_B233,
+    R_EC_ELGAMAL_B283,
+    R_EC_ELGAMAL_B409,
+    R_EC_ELGAMAL_B571,
+#  endif
+    R_EC_ELGAMAL_BRP256R1,
+    R_EC_ELGAMAL_BRP256T1,
+    R_EC_ELGAMAL_BRP384R1,
+    R_EC_ELGAMAL_BRP384T1,
+    R_EC_ELGAMAL_BRP512R1,
+    R_EC_ELGAMAL_BRP512T1,
+#  ifndef OPENSSL_NO_SM2
+    R_EC_ELGAMAL_SM2
+#  endif
+};
+
+static OPT_PAIR ec_elgamal_choices[] = {
+    {"ecelgamalp160", R_EC_ELGAMAL_P160},
+    {"ecelgamalp192", R_EC_ELGAMAL_P192},
+    {"ecelgamalp224", R_EC_ELGAMAL_P224},
+    {"ecelgamalp256", R_EC_ELGAMAL_P256},
+    {"ecelgamalp384", R_EC_ELGAMAL_P384},
+    {"ecelgamalp521", R_EC_ELGAMAL_P521},
+#  ifndef OPENSSL_NO_EC2M
+    {"ecelgamalk163", R_EC_ELGAMAL_K163},
+    {"ecelgamalk233", R_EC_ELGAMAL_K233},
+    {"ecelgamalk283", R_EC_ELGAMAL_K283},
+    {"ecelgamalk409", R_EC_ELGAMAL_K409},
+    {"ecelgamalk571", R_EC_ELGAMAL_K571},
+    {"ecelgamalb163", R_EC_ELGAMAL_B163},
+    {"ecelgamalb233", R_EC_ELGAMAL_B233},
+    {"ecelgamalb283", R_EC_ELGAMAL_B283},
+    {"ecelgamalb409", R_EC_ELGAMAL_B409},
+    {"ecelgamalb571", R_EC_ELGAMAL_B571},
+#  endif
+    {"ecelgamalbrp256r1", R_EC_ELGAMAL_BRP256R1},
+    {"ecelgamalbrp256t1", R_EC_ELGAMAL_BRP256T1},
+    {"ecelgamalbrp384r1", R_EC_ELGAMAL_BRP384R1},
+    {"ecelgamalbrp384t1", R_EC_ELGAMAL_BRP384T1},
+    {"ecelgamalbrp512r1", R_EC_ELGAMAL_BRP512R1},
+    {"ecelgamalbrp512t1", R_EC_ELGAMAL_BRP512T1},
+#  ifndef OPENSSL_NO_SM2
+    {"ecelgamalsm2", R_EC_ELGAMAL_SM2}
+#  endif
+};
+
+static int ec_elgamal_plaintexts[] = {10, 100000, 100000000,
+                                      -10, -100000, -100000000};
+
+#  define EC_ELGAMAL_NUM                  OSSL_NELEM(ec_elgamal_choices)
+#  define EC_ELGAMAL_PLAINTEXTS_NUM       OSSL_NELEM(ec_elgamal_plaintexts)
+
+static double ec_elgamal_results[EC_ELGAMAL_NUM][EC_ELGAMAL_PLAINTEXTS_NUM][6];
+
+# endif /* OPENSSL_NO_EC_ELGAMAL */
 #endif /* OPENSSL_NO_EC */
 
 #ifndef SIGALRM
@@ -658,6 +710,14 @@ typedef struct loopargs_st {
     EVP_MD_CTX *sm2_vfy_ctx[SM2_NUM];
     EVP_PKEY *sm2_pkey[SM2_NUM];
 # endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+    EC_KEY *ec_elgamal_key[EC_ELGAMAL_NUM];
+    EC_ELGAMAL_CTX *ec_elgamal_ctx[EC_ELGAMAL_NUM];
+    EC_ELGAMAL_CIPHERTEXT *ciphertext_a[EC_ELGAMAL_NUM];
+    EC_ELGAMAL_CIPHERTEXT *ciphertext_b[EC_ELGAMAL_NUM];
+    EC_ELGAMAL_CIPHERTEXT *ciphertext_r[EC_ELGAMAL_NUM];
+    EC_ELGAMAL_DECRYPT_TABLE *decrypt_table[EC_ELGAMAL_NUM][2];
+# endif
     unsigned char *secret_a;
     unsigned char *secret_b;
     size_t outlen[EC_NUM];
@@ -673,23 +733,6 @@ static unsigned int testnum;
 
 /* Nb of iterations to do per algorithm and key-size */
 static long c[ALGOR_NUM][OSSL_NELEM(lengths_list)];
-
-#ifndef OPENSSL_NO_MD2
-static int EVP_Digest_MD2_loop(void *args)
-{
-    loopargs_t *tempargs = *(loopargs_t **) args;
-    unsigned char *buf = tempargs->buf;
-    unsigned char md2[MD2_DIGEST_LENGTH];
-    int count;
-
-    for (count = 0; COND(c[D_MD2][testnum]); count++) {
-        if (!EVP_Digest(buf, (size_t)lengths[testnum], md2, NULL, EVP_md2(),
-                        NULL))
-            return -1;
-    }
-    return count;
-}
-#endif
 
 #ifndef OPENSSL_NO_MDC2
 static int EVP_Digest_MDC2_loop(void *args)
@@ -1373,6 +1416,96 @@ static int SM2_verify_loop(void *args)
     return count;
 }
 # endif                         /* OPENSSL_NO_SM2 */
+
+# ifndef OPENSSL_NO_EC_ELGAMAL
+static int ec_elgamal_encrypt = 0;
+static int ec_elgamal_decrypt = 0;
+static int ec_elgamal_add = 0;
+static int ec_elgamal_sub = 0;
+static int ec_elgamal_mul = 0;
+
+static int32_t ec_elgamal_plaintext_a = 9;
+static int32_t ec_elgamal_plaintext_b = 0;
+
+static long ec_elgamal_c[EC_ELGAMAL_NUM][5];
+
+static int EC_ELGAMAL_loop(void *args)
+{
+    loopargs_t *tempargs = *(loopargs_t **) args;
+    EC_ELGAMAL_CTX **ectx = tempargs->ec_elgamal_ctx;
+    EC_ELGAMAL_CIPHERTEXT **ciphertext_a = tempargs->ciphertext_a;
+    EC_ELGAMAL_CIPHERTEXT **ciphertext_b = tempargs->ciphertext_b;
+    EC_ELGAMAL_CIPHERTEXT **ciphertext_r = tempargs->ciphertext_r;
+    int count = 0, dcount = ec_elgamal_c[testnum][1];
+    int32_t r;
+
+    if (ec_elgamal_encrypt) {
+        for (; COND(ec_elgamal_c[testnum][0]); count++) {
+            if (!EC_ELGAMAL_encrypt(ectx[testnum], ciphertext_b[testnum],
+                                    ec_elgamal_plaintext_b)) {
+                BIO_printf(bio_err, "EC-ElGamal encrypt failure\n");
+                ERR_print_errors(bio_err);
+                count = -1;
+                break;
+            }
+        }
+    } else if (ec_elgamal_decrypt) {
+        if (ec_elgamal_plaintext_b > 0) {
+            EC_ELGAMAL_CTX_set_decrypt_table(ectx[testnum],
+                                             tempargs->decrypt_table[testnum][0]);
+            if (ec_elgamal_plaintext_b > 100000)
+                dcount = 20;
+        } else {
+            EC_ELGAMAL_CTX_set_decrypt_table(ectx[testnum],
+                                             tempargs->decrypt_table[testnum][1]);
+            dcount = 3;
+        }
+
+        for (; COND(dcount); count++) {
+            if (!EC_ELGAMAL_decrypt(ectx[testnum], &r, ciphertext_b[testnum])) {
+                BIO_printf(bio_err, "EC-ElGamal decrypt(+) failure\n");
+                ERR_print_errors(bio_err);
+                count = -1;
+                break;
+            }
+        }
+    } else if (ec_elgamal_add) {
+        for (; COND(ec_elgamal_c[testnum][2]); count++) {
+            if (!EC_ELGAMAL_add(ectx[testnum], ciphertext_r[testnum],
+                                ciphertext_a[testnum], ciphertext_b[testnum])) {
+                BIO_printf(bio_err, "EC-ElGamal add failure\n");
+                ERR_print_errors(bio_err);
+                count = -1;
+                break;
+            }
+        }
+    } else if (ec_elgamal_sub) {
+        for (; COND(ec_elgamal_c[testnum][3]); count++) {
+            if (!EC_ELGAMAL_sub(ectx[testnum], ciphertext_r[testnum],
+                                ciphertext_a[testnum], ciphertext_b[testnum])) {
+                BIO_printf(bio_err, "EC-ElGamal sub failure\n");
+                ERR_print_errors(bio_err);
+                count = -1;
+                break;
+            }
+        }
+    } else if (ec_elgamal_mul) {
+        for (; COND(ec_elgamal_c[testnum][4]); count++) {
+            if (!EC_ELGAMAL_mul(ectx[testnum], ciphertext_r[testnum],
+                                ciphertext_b[testnum], ec_elgamal_plaintext_a)) {
+                BIO_printf(bio_err, "EC-ElGamal mul failure\n");
+                ERR_print_errors(bio_err);
+                count = -1;
+                break;
+            }
+        }
+    }
+
+    (void)dcount;
+
+    return count;
+}
+# endif                         /* OPENSSL_NO_EC_ELGAMAL */
 #endif                          /* OPENSSL_NO_EC */
 
 static int run_benchmark(int async_jobs,
@@ -1552,7 +1685,8 @@ int speed_main(int argc, char **argv)
 #endif
     openssl_speed_sec_t seconds = { SECONDS, RSA_SECONDS, DSA_SECONDS,
                                     ECDSA_SECONDS, ECDH_SECONDS,
-                                    EdDSA_SECONDS, SM2_SECONDS };
+                                    EdDSA_SECONDS, SM2_SECONDS,
+                                    EC_ELGAMAL_SECONDS };
 
     /* What follows are the buffers and key material. */
 #ifndef OPENSSL_NO_RC5
@@ -1563,9 +1697,6 @@ int speed_main(int argc, char **argv)
 #endif
 #ifndef OPENSSL_NO_IDEA
     IDEA_KEY_SCHEDULE idea_ks;
-#endif
-#ifndef OPENSSL_NO_SEED
-    SEED_KEY_SCHEDULE seed_ks;
 #endif
 #ifndef OPENSSL_NO_BF
     BF_KEY bf_ks;
@@ -1588,20 +1719,6 @@ int speed_main(int argc, char **argv)
         0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34,
         0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56
     };
-#ifndef OPENSSL_NO_CAMELLIA
-    static const unsigned char ckey24[24] = {
-        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-        0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12,
-        0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34
-    };
-    static const unsigned char ckey32[32] = {
-        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0,
-        0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12,
-        0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34,
-        0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x12, 0x34, 0x56
-    };
-    CAMELLIA_KEY camellia_ks1, camellia_ks2, camellia_ks3;
-#endif
 #ifndef OPENSSL_NO_DES
     static DES_cblock key = {
         0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0
@@ -1694,11 +1811,50 @@ int speed_main(int argc, char **argv)
         {"CurveSM2", NID_sm2, 256}
     };
 # endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+    static const struct {
+        const char *name;
+        unsigned int nid;
+    } test_ec_elgamal_curves[] = {
+        /* Prime Curves */
+        {"secp160r1", NID_secp160r1},
+        {"nistp192", NID_X9_62_prime192v1},
+        {"nistp224", NID_secp224r1},
+        {"nistp256", NID_X9_62_prime256v1},
+        {"nistp384", NID_secp384r1},
+        {"nistp521", NID_secp521r1},
+#  ifndef OPENSSL_NO_EC2M
+        /* Binary Curves */
+        {"nistk163", NID_sect163k1},
+        {"nistk233", NID_sect233k1},
+        {"nistk283", NID_sect283k1},
+        {"nistk409", NID_sect409k1},
+        {"nistk571", NID_sect571k1},
+        {"nistb163", NID_sect163r2},
+        {"nistb233", NID_sect233r1},
+        {"nistb283", NID_sect283r1},
+        {"nistb409", NID_sect409r1},
+        {"nistb571", NID_sect571r1},
+#  endif
+        {"brainpoolP256r1", NID_brainpoolP256r1},
+        {"brainpoolP256t1", NID_brainpoolP256t1},
+        {"brainpoolP384r1", NID_brainpoolP384r1},
+        {"brainpoolP384t1", NID_brainpoolP384t1},
+        {"brainpoolP512r1", NID_brainpoolP512r1},
+        {"brainpoolP512t1", NID_brainpoolP512t1},
+#  ifndef OPENSSL_NO_SM2
+        {"sm2", NID_sm2},
+#  endif
+    };
+# endif
     int ecdsa_doit[ECDSA_NUM] = { 0 };
     int ecdh_doit[EC_NUM] = { 0 };
     int eddsa_doit[EdDSA_NUM] = { 0 };
 # ifndef OPENSSL_NO_SM2
     int sm2_doit[SM2_NUM] = { 0 };
+# endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+    int ec_elgamal_doit[EC_ELGAMAL_NUM] = { 0 };
 # endif
     OPENSSL_assert(OSSL_NELEM(test_curves) >= EC_NUM);
     OPENSSL_assert(OSSL_NELEM(test_ed_curves) >= EdDSA_NUM);
@@ -1798,7 +1954,7 @@ int speed_main(int argc, char **argv)
         case OPT_SECONDS:
             seconds.sym = seconds.rsa = seconds.dsa = seconds.ecdsa
                         = seconds.ecdh = seconds.eddsa
-                        = seconds.sm2 = atoi(opt_arg());
+                        = seconds.sm2 = seconds.ec_elgamal = atoi(opt_arg());
             break;
         case OPT_BYTES:
             lengths_single = atoi(opt_arg());
@@ -1857,12 +2013,6 @@ int speed_main(int argc, char **argv)
             doit[D_CBC_128_AES] = doit[D_CBC_192_AES] = doit[D_CBC_256_AES] = 1;
             continue;
         }
-#ifndef OPENSSL_NO_CAMELLIA
-        if (strcmp(*argv, "camellia") == 0) {
-            doit[D_CBC_128_CML] = doit[D_CBC_192_CML] = doit[D_CBC_256_CML] = 1;
-            continue;
-        }
-#endif
 #ifndef OPENSSL_NO_EC
         if (strcmp(*argv, "ecdsa") == 0) {
             for (loop = 0; loop < OSSL_NELEM(ecdsa_doit); loop++)
@@ -1899,6 +2049,23 @@ int speed_main(int argc, char **argv)
         }
         if (found(*argv, sm2_choices, &i)) {
             sm2_doit[i] = 2;
+            continue;
+        }
+# endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+        if (strcmp(*argv, "ecelgamal") == 0) {
+            for (loop = 0; loop < OSSL_NELEM(ec_elgamal_doit); loop++)
+                ec_elgamal_doit[loop] = 1;
+#  ifndef OPENSSL_NO_EC2M
+            for (loop = R_EC_ELGAMAL_K163; loop <= R_EC_ELGAMAL_BRP512T1; loop++)
+#  else
+            for (loop = R_EC_ELGAMAL_BRP256R1; loop <= R_EC_ELGAMAL_BRP512T1; loop++)
+#  endif
+                ec_elgamal_doit[loop] = 0;
+            continue;
+        }
+        if (found(*argv, ec_elgamal_choices, &i)) {
+            ec_elgamal_doit[i] = 2;
             continue;
         }
 # endif
@@ -2054,16 +2221,8 @@ int speed_main(int argc, char **argv)
     AES_set_encrypt_key(key16, 128, &aes_ks1);
     AES_set_encrypt_key(key24, 192, &aes_ks2);
     AES_set_encrypt_key(key32, 256, &aes_ks3);
-#ifndef OPENSSL_NO_CAMELLIA
-    Camellia_set_key(key16, 128, &camellia_ks1);
-    Camellia_set_key(ckey24, 192, &camellia_ks2);
-    Camellia_set_key(ckey32, 256, &camellia_ks3);
-#endif
 #ifndef OPENSSL_NO_IDEA
     IDEA_set_encrypt_key(key16, &idea_ks);
-#endif
-#ifndef OPENSSL_NO_SEED
-    SEED_set_key(key16, &seed_ks);
 #endif
 #ifndef OPENSSL_NO_RC4
     RC4_set_key(&rc4_ks, 16, key16);
@@ -2094,7 +2253,6 @@ int speed_main(int argc, char **argv)
         d = Time_F(STOP);
     } while (d < 3);
     save_count = count;
-    c[D_MD2][0] = count / 10;
     c[D_MDC2][0] = count / 10;
     c[D_MD4][0] = count;
     c[D_MD5][0] = count;
@@ -2105,7 +2263,6 @@ int speed_main(int argc, char **argv)
     c[D_CBC_DES][0] = count;
     c[D_EDE3_DES][0] = count / 3;
     c[D_CBC_IDEA][0] = count;
-    c[D_CBC_SEED][0] = count;
     c[D_CBC_RC2][0] = count;
     c[D_CBC_RC5][0] = count;
     c[D_CBC_BF][0] = count;
@@ -2133,7 +2290,6 @@ int speed_main(int argc, char **argv)
         l0 = (long)lengths[0];
         l1 = (long)lengths[i];
 
-        c[D_MD2][i] = c[D_MD2][0] * 4 * l0 / l1;
         c[D_MDC2][i] = c[D_MDC2][0] * 4 * l0 / l1;
         c[D_MD4][i] = c[D_MD4][0] * 4 * l0 / l1;
         c[D_MD5][i] = c[D_MD5][0] * 4 * l0 / l1;
@@ -2153,7 +2309,6 @@ int speed_main(int argc, char **argv)
         c[D_CBC_DES][i] = c[D_CBC_DES][i - 1] * l0 / l1;
         c[D_EDE3_DES][i] = c[D_EDE3_DES][i - 1] * l0 / l1;
         c[D_CBC_IDEA][i] = c[D_CBC_IDEA][i - 1] * l0 / l1;
-        c[D_CBC_SEED][i] = c[D_CBC_SEED][i - 1] * l0 / l1;
         c[D_CBC_RC2][i] = c[D_CBC_RC2][i - 1] * l0 / l1;
         c[D_CBC_RC5][i] = c[D_CBC_RC5][i - 1] * l0 / l1;
         c[D_CBC_BF][i] = c[D_CBC_BF][i - 1] * l0 / l1;
@@ -2318,7 +2473,147 @@ int speed_main(int argc, char **argv)
 #   ifndef OPENSSL_NO_SM2
     sm2_c[R_EC_SM2P256][0] = count / 1800;
 #   endif
-#  endif
+#   ifndef OPENSSL_NO_EC_ELGAMAL
+    ec_elgamal_c[R_EC_ELGAMAL_P160][0] = count / 18000;
+    ec_elgamal_c[R_EC_ELGAMAL_P160][1] = count / 180000;
+    ec_elgamal_c[R_EC_ELGAMAL_P160][2] = count / 130;
+    ec_elgamal_c[R_EC_ELGAMAL_P160][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_P160][4] = count / 20000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_P192][0] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_P192][1] = count / 10000;
+    ec_elgamal_c[R_EC_ELGAMAL_P192][2] = count / 130;
+    ec_elgamal_c[R_EC_ELGAMAL_P192][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_P192][4] = count / 20000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_P224][0] = count / 10000;
+    ec_elgamal_c[R_EC_ELGAMAL_P224][1] = count / 10000;
+    ec_elgamal_c[R_EC_ELGAMAL_P224][2] = count / 140;
+    ec_elgamal_c[R_EC_ELGAMAL_P224][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_P224][4] = count / 30000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_P256][0] = count / 2400;
+    ec_elgamal_c[R_EC_ELGAMAL_P256][1] = count / 2000;
+    ec_elgamal_c[R_EC_ELGAMAL_P256][2] = count / 150;
+    ec_elgamal_c[R_EC_ELGAMAL_P256][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_P256][4] = count / 3000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_P384][0] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_P384][1] = count / 40000;
+    ec_elgamal_c[R_EC_ELGAMAL_P384][2] = count / 17000;
+    ec_elgamal_c[R_EC_ELGAMAL_P384][3] = count / 2400;
+    ec_elgamal_c[R_EC_ELGAMAL_P384][4] = count / 73000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_P521][0] = count / 60000 / 2;
+    ec_elgamal_c[R_EC_ELGAMAL_P521][1] = count / 40000 / 2;
+    ec_elgamal_c[R_EC_ELGAMAL_P521][2] = count / 250;
+    ec_elgamal_c[R_EC_ELGAMAL_P521][3] = count / 3000;
+    ec_elgamal_c[R_EC_ELGAMAL_P521][4] = count / 73000 / 2;
+#    ifndef OPENSSL_NO_EC2M
+    ec_elgamal_c[R_EC_ELGAMAL_K163][0] = count / 50000;
+    ec_elgamal_c[R_EC_ELGAMAL_K163][1] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_K163][2] = count / 1000;
+    ec_elgamal_c[R_EC_ELGAMAL_K163][3] = count / 1000;
+    ec_elgamal_c[R_EC_ELGAMAL_K163][4] = count / 33000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_K233][0] = count / 70000;
+    ec_elgamal_c[R_EC_ELGAMAL_K233][1] = count / 25000;
+    ec_elgamal_c[R_EC_ELGAMAL_K233][2] = count / 1400;
+    ec_elgamal_c[R_EC_ELGAMAL_K233][3] = count / 1400;
+    ec_elgamal_c[R_EC_ELGAMAL_K233][4] = count / 50000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_K283][0] = count / 120000;
+    ec_elgamal_c[R_EC_ELGAMAL_K283][1] = count / 40000;
+    ec_elgamal_c[R_EC_ELGAMAL_K283][2] = count / 1700;
+    ec_elgamal_c[R_EC_ELGAMAL_K283][3] = count / 1700;
+    ec_elgamal_c[R_EC_ELGAMAL_K283][4] = count / 80000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_K409][0] = count / 200000;
+    ec_elgamal_c[R_EC_ELGAMAL_K409][1] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_K409][2] = count / 2500;
+    ec_elgamal_c[R_EC_ELGAMAL_K409][3] = count / 2500;
+    ec_elgamal_c[R_EC_ELGAMAL_K409][4] = count / 120000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_K571][0] = count / 400000;
+    ec_elgamal_c[R_EC_ELGAMAL_K571][1] = count / 120000;
+    ec_elgamal_c[R_EC_ELGAMAL_K571][2] = count / 4000;
+    ec_elgamal_c[R_EC_ELGAMAL_K571][3] = count / 4000;
+    ec_elgamal_c[R_EC_ELGAMAL_K571][4] = count / 250000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_B163][0] = count / 50000;
+    ec_elgamal_c[R_EC_ELGAMAL_B163][1] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_B163][2] = count / 1000;
+    ec_elgamal_c[R_EC_ELGAMAL_B163][3] = count / 1000;
+    ec_elgamal_c[R_EC_ELGAMAL_B163][4] = count / 35000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_B233][0] = count / 65000;
+    ec_elgamal_c[R_EC_ELGAMAL_B233][1] = count / 25000;
+    ec_elgamal_c[R_EC_ELGAMAL_B233][2] = count / 1300;
+    ec_elgamal_c[R_EC_ELGAMAL_B233][3] = count / 1300;
+    ec_elgamal_c[R_EC_ELGAMAL_B233][4] = count / 45000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_B283][0] = count / 65000 / 2;
+    ec_elgamal_c[R_EC_ELGAMAL_B283][1] = count / 40000;
+    ec_elgamal_c[R_EC_ELGAMAL_B283][2] = count / 1700;
+    ec_elgamal_c[R_EC_ELGAMAL_B283][3] = count / 1700;
+    ec_elgamal_c[R_EC_ELGAMAL_B283][4] = count / 90000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_B409][0] = count / 200000;
+    ec_elgamal_c[R_EC_ELGAMAL_B409][1] = count / 65000;
+    ec_elgamal_c[R_EC_ELGAMAL_B409][2] = count / 2500;
+    ec_elgamal_c[R_EC_ELGAMAL_B409][3] = count / 2500;
+    ec_elgamal_c[R_EC_ELGAMAL_B409][4] = count / 130000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_B571][0] = count / 450000;
+    ec_elgamal_c[R_EC_ELGAMAL_B571][1] = count / 150000;
+    ec_elgamal_c[R_EC_ELGAMAL_B571][2] = count / 4000;
+    ec_elgamal_c[R_EC_ELGAMAL_B571][3] = count / 4000;
+    ec_elgamal_c[R_EC_ELGAMAL_B571][4] = count / 300000;
+#    endif
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256R1][0] = count / 30000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256R1][1] = count / 18000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256R1][2] = count / 140;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256R1][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256R1][4] = count / 32000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256T1][0] = count / 30000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256T1][1] = count / 18000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256T1][2] = count / 140;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256T1][3] = count / 200;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP256T1][4] = count / 32000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384R1][0] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384R1][1] = count / 40000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384R1][2] = count / 160;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384R1][3] = count / 210;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384R1][4] = count / 70000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384T1][0] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384T1][1] = count / 40000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384T1][2] = count / 160;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384T1][3] = count / 210;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP384T1][4] = count / 70000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512R1][0] = count / 90000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512R1][1] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512R1][2] = count / 180;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512R1][3] = count / 210;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512R1][4] = count / 120000;
+
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512T1][0] = count / 90000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512T1][1] = count / 60000;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512T1][2] = count / 180;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512T1][3] = count / 210;
+    ec_elgamal_c[R_EC_ELGAMAL_BRP512T1][4] = count / 120000;
+#    ifndef OPENSSL_NO_SM2
+    ec_elgamal_c[R_EC_ELGAMAL_SM2][0] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_SM2][1] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_SM2][2] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_SM2][3] = count / 20000;
+    ec_elgamal_c[R_EC_ELGAMAL_SM2][4] = count / 20000;
+#    endif  /* OPENSSL_NO_SM2 */
+#   endif   /* OPENSSL_NO_EC_ELGAMAL */
+#  endif    /* OPENSSL_NO_EC */
 
 # else
 /* not worth fixing */
@@ -2328,18 +2623,6 @@ int speed_main(int argc, char **argv)
     signal(SIGALRM, alarmed);
 #endif                          /* SIGALRM */
 
-#ifndef OPENSSL_NO_MD2
-    if (doit[D_MD2]) {
-        for (testnum = 0; testnum < size_num; testnum++) {
-            print_message(names[D_MD2], c[D_MD2][testnum], lengths[testnum],
-                          seconds.sym);
-            Time_F(START);
-            count = run_benchmark(async_jobs, EVP_Digest_MD2_loop, loopargs);
-            d = Time_F(STOP);
-            print_result(D_MD2, testnum, count, d);
-        }
-    }
-#endif
 #ifndef OPENSSL_NO_MDC2
     if (doit[D_MDC2]) {
         for (testnum = 0; testnum < size_num; testnum++) {
@@ -2596,66 +2879,6 @@ int speed_main(int argc, char **argv)
         for (i = 0; i < loopargs_len; i++)
             CRYPTO_gcm128_release(loopargs[i].gcm_ctx);
     }
-#ifndef OPENSSL_NO_CAMELLIA
-    if (doit[D_CBC_128_CML]) {
-        if (async_jobs > 0) {
-            BIO_printf(bio_err, "Async mode is not supported with %s\n",
-                       names[D_CBC_128_CML]);
-            doit[D_CBC_128_CML] = 0;
-        }
-        for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
-            print_message(names[D_CBC_128_CML], c[D_CBC_128_CML][testnum],
-                          lengths[testnum], seconds.sym);
-            Time_F(START);
-            for (count = 0; COND(c[D_CBC_128_CML][testnum]); count++)
-                Camellia_cbc_encrypt(loopargs[0].buf, loopargs[0].buf,
-                                     (size_t)lengths[testnum], &camellia_ks1,
-                                     iv, CAMELLIA_ENCRYPT);
-            d = Time_F(STOP);
-            print_result(D_CBC_128_CML, testnum, count, d);
-        }
-    }
-    if (doit[D_CBC_192_CML]) {
-        if (async_jobs > 0) {
-            BIO_printf(bio_err, "Async mode is not supported with %s\n",
-                       names[D_CBC_192_CML]);
-            doit[D_CBC_192_CML] = 0;
-        }
-        for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
-            print_message(names[D_CBC_192_CML], c[D_CBC_192_CML][testnum],
-                          lengths[testnum], seconds.sym);
-            if (async_jobs > 0) {
-                BIO_printf(bio_err, "Async mode is not supported, exiting...");
-                exit(1);
-            }
-            Time_F(START);
-            for (count = 0; COND(c[D_CBC_192_CML][testnum]); count++)
-                Camellia_cbc_encrypt(loopargs[0].buf, loopargs[0].buf,
-                                     (size_t)lengths[testnum], &camellia_ks2,
-                                     iv, CAMELLIA_ENCRYPT);
-            d = Time_F(STOP);
-            print_result(D_CBC_192_CML, testnum, count, d);
-        }
-    }
-    if (doit[D_CBC_256_CML]) {
-        if (async_jobs > 0) {
-            BIO_printf(bio_err, "Async mode is not supported with %s\n",
-                       names[D_CBC_256_CML]);
-            doit[D_CBC_256_CML] = 0;
-        }
-        for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
-            print_message(names[D_CBC_256_CML], c[D_CBC_256_CML][testnum],
-                          lengths[testnum], seconds.sym);
-            Time_F(START);
-            for (count = 0; COND(c[D_CBC_256_CML][testnum]); count++)
-                Camellia_cbc_encrypt(loopargs[0].buf, loopargs[0].buf,
-                                     (size_t)lengths[testnum], &camellia_ks3,
-                                     iv, CAMELLIA_ENCRYPT);
-            d = Time_F(STOP);
-            print_result(D_CBC_256_CML, testnum, count, d);
-        }
-    }
-#endif
 #ifndef OPENSSL_NO_IDEA
     if (doit[D_CBC_IDEA]) {
         if (async_jobs > 0) {
@@ -2673,25 +2896,6 @@ int speed_main(int argc, char **argv)
                                  iv, IDEA_ENCRYPT);
             d = Time_F(STOP);
             print_result(D_CBC_IDEA, testnum, count, d);
-        }
-    }
-#endif
-#ifndef OPENSSL_NO_SEED
-    if (doit[D_CBC_SEED]) {
-        if (async_jobs > 0) {
-            BIO_printf(bio_err, "Async mode is not supported with %s\n",
-                       names[D_CBC_SEED]);
-            doit[D_CBC_SEED] = 0;
-        }
-        for (testnum = 0; testnum < size_num && async_init == 0; testnum++) {
-            print_message(names[D_CBC_SEED], c[D_CBC_SEED][testnum],
-                          lengths[testnum], seconds.sym);
-            Time_F(START);
-            for (count = 0; COND(c[D_CBC_SEED][testnum]); count++)
-                SEED_cbc_encrypt(loopargs[0].buf, loopargs[0].buf,
-                                 (size_t)lengths[testnum], &seed_ks, iv, 1);
-            d = Time_F(STOP);
-            print_result(D_CBC_SEED, testnum, count, d);
         }
     }
 #endif
@@ -3579,6 +3783,188 @@ int speed_main(int argc, char **argv)
     }
 # endif                         /* OPENSSL_NO_SM2 */
 
+# ifndef OPENSSL_NO_EC_ELGAMAL
+    for (testnum = 0; testnum < EC_ELGAMAL_NUM; testnum++) {
+        int st = 1;
+        int32_t r = 0;
+        EC_ELGAMAL_CTX *ectx = NULL;
+
+        if (!ec_elgamal_doit[testnum])
+            continue;           /* Ignore Curve */
+        ec_elgamal_plaintext_b = ec_elgamal_plaintexts[0];
+
+        for (i = 0; i < loopargs_len; i++) {
+            loopargs[i].ec_elgamal_key[testnum] =
+                EC_KEY_new_by_curve_name(test_ec_elgamal_curves[testnum].nid);
+            if (loopargs[i].ec_elgamal_key[testnum] == NULL) {
+                st = 0;
+                break;
+            }
+
+            EC_KEY_precompute_mult(loopargs[i].ec_elgamal_key[testnum], NULL);
+            EC_KEY_generate_key(loopargs[i].ec_elgamal_key[testnum]);
+
+            ectx = EC_ELGAMAL_CTX_new(loopargs[i].ec_elgamal_key[testnum]);
+            if (ectx == NULL) {
+                st = 0;
+                break;
+            }
+
+            loopargs[i].ec_elgamal_ctx[testnum] = ectx;
+
+            loopargs[i].ciphertext_a[testnum] = EC_ELGAMAL_CIPHERTEXT_new(ectx);
+            loopargs[i].ciphertext_b[testnum] = EC_ELGAMAL_CIPHERTEXT_new(ectx);
+            loopargs[i].ciphertext_r[testnum] = EC_ELGAMAL_CIPHERTEXT_new(ectx);
+
+            if (!mr)
+                BIO_printf(bio_err, "Doing ec_elgamal init with curve %s: ",
+                           test_ec_elgamal_curves[testnum].name);
+
+            Time_F(START);
+            loopargs[i].decrypt_table[testnum][0] = EC_ELGAMAL_DECRYPT_TABLE_new(ectx, 0);
+            d = Time_F(STOP);
+            ec_elgamal_results[testnum][0][0] = d;
+            Time_F(START);
+            loopargs[i].decrypt_table[testnum][1] = EC_ELGAMAL_DECRYPT_TABLE_new(ectx, 1);
+            d = Time_F(STOP);
+            ec_elgamal_results[testnum][1][0] = d;
+
+            if (!mr)
+                BIO_printf(bio_err, "%.2fs\n", d);
+
+            EC_ELGAMAL_CTX_set_decrypt_table(ectx,
+                                             loopargs[i].decrypt_table[testnum][1]);
+
+            if (!EC_ELGAMAL_encrypt(ectx, loopargs[i].ciphertext_a[testnum],
+                                    ec_elgamal_plaintext_a)
+                || !EC_ELGAMAL_encrypt(ectx, loopargs[i].ciphertext_b[testnum],
+                                       ec_elgamal_plaintext_b)
+                || !EC_ELGAMAL_add(ectx, loopargs[i].ciphertext_r[testnum],
+                                   loopargs[i].ciphertext_a[testnum],
+                                   loopargs[i].ciphertext_b[testnum])
+                || !EC_ELGAMAL_decrypt(ectx, &r,
+                                       loopargs[i].ciphertext_r[testnum])
+                || r != (ec_elgamal_plaintext_a + ec_elgamal_plaintext_b)
+                || !EC_ELGAMAL_sub(ectx, loopargs[i].ciphertext_r[testnum],
+                                   loopargs[i].ciphertext_a[testnum],
+                                   loopargs[i].ciphertext_b[testnum])
+                || !EC_ELGAMAL_decrypt(ectx, &r,
+                                       loopargs[i].ciphertext_r[testnum])
+                || r != (ec_elgamal_plaintext_a - ec_elgamal_plaintext_b)
+                || !EC_ELGAMAL_mul(ectx, loopargs[i].ciphertext_r[testnum],
+                                   loopargs[i].ciphertext_b[testnum],
+                                   ec_elgamal_plaintext_a)
+                || !EC_ELGAMAL_decrypt(ectx, &r,
+                                       loopargs[i].ciphertext_r[testnum])
+                || r != (ec_elgamal_plaintext_a * ec_elgamal_plaintext_b)) {
+                st = 0;
+                break;
+            }
+        }
+
+        if (st == 0) {
+            BIO_printf(bio_err, "EC-ElGamal failure.\n");
+            ERR_print_errors(bio_err);
+            rsa_count = 1;
+        } else {
+            unsigned long j = 0;
+
+            for (j = 0; j < sizeof(ec_elgamal_plaintexts) / sizeof(int); j++) {
+                ec_elgamal_print_message("encrypt",
+                                         test_ec_elgamal_curves[testnum].name,
+                                         ec_elgamal_c[testnum][0],
+                                         seconds.ec_elgamal);
+                ec_elgamal_decrypt = 0;
+                ec_elgamal_add = 0;
+                ec_elgamal_sub = 0;
+                ec_elgamal_mul = 0;
+                ec_elgamal_plaintext_b = ec_elgamal_plaintexts[j];
+
+                ec_elgamal_encrypt = 1;
+                Time_F(START);
+                count = run_benchmark(async_jobs, EC_ELGAMAL_loop, loopargs);
+                d = Time_F(STOP);
+                ec_elgamal_encrypt = 0;
+
+                BIO_printf(bio_err,
+                           mr ? "+R12:%ld:%s:%d:%.2f\n" :
+                           "%ld %s EC-ElGamal encrypt(%d) in %.2fs \n",
+                           count, test_ec_elgamal_curves[testnum].name,
+                           ec_elgamal_plaintext_b, d);
+                ec_elgamal_results[testnum][j][1] = (double)count / d;
+
+                ec_elgamal_print_message("decrypt",
+                                         test_ec_elgamal_curves[testnum].name,
+                                         ec_elgamal_c[testnum][1],
+                                         seconds.ec_elgamal);
+                ec_elgamal_decrypt = 1;
+                Time_F(START);
+                count = run_benchmark(async_jobs, EC_ELGAMAL_loop, loopargs);
+                d = Time_F(STOP);
+                ec_elgamal_decrypt = 0;
+
+                BIO_printf(bio_err,
+                           mr ? "+R13:%ld:%s:%d:%.2f\n" :
+                           "%ld %s EC-ElGamal decrypt(%d) in %.2fs \n",
+                           count, test_ec_elgamal_curves[testnum].name,
+                           ec_elgamal_plaintext_b, d);
+                ec_elgamal_results[testnum][j][2] = (double)count / d;
+
+                ec_elgamal_print_message("add",
+                                         test_ec_elgamal_curves[testnum].name,
+                                         ec_elgamal_c[testnum][2],
+                                         seconds.ec_elgamal);
+                ec_elgamal_add = 1;
+                Time_F(START);
+                count = run_benchmark(async_jobs, EC_ELGAMAL_loop, loopargs);
+                d = Time_F(STOP);
+                ec_elgamal_add = 0;
+
+                BIO_printf(bio_err,
+                           mr ? "+R14:%ld:%s:%d:%d:%.2f\n" :
+                           "%ld %s EC-ElGamal add(%d,%d) in %.2fs \n",
+                           count, test_ec_elgamal_curves[testnum].name,
+                           ec_elgamal_plaintext_a, ec_elgamal_plaintext_b, d);
+                ec_elgamal_results[testnum][j][3] = (double)count / d;
+
+                ec_elgamal_print_message("sub",
+                                         test_ec_elgamal_curves[testnum].name,
+                                         ec_elgamal_c[testnum][3],
+                                         seconds.ec_elgamal);
+                ec_elgamal_sub = 1;
+                Time_F(START);
+                count = run_benchmark(async_jobs, EC_ELGAMAL_loop, loopargs);
+                d = Time_F(STOP);
+                ec_elgamal_sub = 0;
+
+                BIO_printf(bio_err,
+                           mr ? "+R15:%ld:%s:%d:%d:%.2f\n" :
+                           "%ld %s EC-ElGamal sub(%d,%d) in %.2fs \n",
+                           count, test_ec_elgamal_curves[testnum].name,
+                           ec_elgamal_plaintext_a, ec_elgamal_plaintext_b, d);
+                ec_elgamal_results[testnum][j][4] = (double)count / d;
+
+                ec_elgamal_print_message("mul",
+                                         test_ec_elgamal_curves[testnum].name,
+                                         ec_elgamal_c[testnum][4],
+                                         seconds.ec_elgamal);
+                ec_elgamal_mul = 1;
+                Time_F(START);
+                count = run_benchmark(async_jobs, EC_ELGAMAL_loop, loopargs);
+                d = Time_F(STOP);
+                ec_elgamal_mul = 0;
+
+                BIO_printf(bio_err,
+                           mr ? "+R16:%ld:%s:%d:%d:%.2f\n" :
+                           "%ld %s EC-ElGamal mul(%d,%d) in %.2fs \n",
+                           count, test_ec_elgamal_curves[testnum].name,
+                           ec_elgamal_plaintext_a, ec_elgamal_plaintext_b, d);
+                ec_elgamal_results[testnum][j][5] = (double)count / d;
+            }
+        }
+    }
+# endif                         /* OPENSSL_NO_EC_ELGAMAL */
+
 #endif                          /* OPENSSL_NO_EC */
 #ifndef NO_FORK
  show_res:
@@ -3588,9 +3974,6 @@ int speed_main(int argc, char **argv)
         printf("%s\n", OpenSSL_version(OPENSSL_BUILT_ON));
         printf("options:");
         printf("%s ", BN_options());
-#ifndef OPENSSL_NO_MD2
-        printf("%s ", MD2_options());
-#endif
 #ifndef OPENSSL_NO_RC4
         printf("%s ", RC4_options());
 #endif
@@ -3752,6 +4135,55 @@ int speed_main(int argc, char **argv)
                    sm2_results[k][0], sm2_results[k][1]);
     }
 # endif
+
+# ifndef OPENSSL_NO_EC_ELGAMAL
+    unsigned long j = 0;
+    testnum = 1;
+    for (k = 0; k < OSSL_NELEM(ec_elgamal_doit); k++) {
+        if (!ec_elgamal_doit[k])
+            continue;
+        if (testnum && !mr) {
+            printf("%-20s %15s %15s\n", "EC-ElGamal curve", "init[+](s)", "init[+-](s)");
+            testnum = 0;
+        }
+
+        if (mr)
+            printf("+F8:%u:%s:%f:%f\n", k, test_ec_elgamal_curves[k].name,
+                   ec_elgamal_results[k][0][0], ec_elgamal_results[k][1][0]);
+        else
+            printf("%-20s %15.1f %15.1f\n", test_ec_elgamal_curves[k].name,
+                   ec_elgamal_results[k][0][0], ec_elgamal_results[k][1][0]);
+    }
+
+    testnum = 1;
+    for (k = 0; k < OSSL_NELEM(ec_elgamal_doit); k++) {
+        if (!ec_elgamal_doit[k])
+            continue;
+        if (testnum && !mr) {
+            printf("\n%-20s %4s %12s   %12s   %12s %12s %12s %12s\n",
+                    "EC-ElGamal curve", "a", "b", "encrypt(b)/s",
+                    "decrypt(b)/s", "add(a,b)/s", "sub(a,b)/s", "mul(a,b)/s");
+            testnum = 0;
+        }
+
+        for (j = 0; j < sizeof(ec_elgamal_plaintexts) / sizeof(int); j++) {
+            if (mr)
+                printf("+F9:%u:%ld:%s:%d:%d:%f:%f:%f:%f:%f\n", k, j,
+                       test_ec_elgamal_curves[k].name, ec_elgamal_plaintext_a,
+                       ec_elgamal_plaintexts[j], ec_elgamal_results[k][j][1],
+                       ec_elgamal_results[k][j][2], ec_elgamal_results[k][j][3],
+                       ec_elgamal_results[k][j][4], ec_elgamal_results[k][j][5]);
+            else
+                printf("%-20s %4d %12d   %12.1f   %12.1f %12.1f"
+                       "%12.1f %12.1f\n", test_ec_elgamal_curves[k].name,
+                       ec_elgamal_plaintext_a, ec_elgamal_plaintexts[j],
+                       ec_elgamal_results[k][j][1], ec_elgamal_results[k][j][2],
+                       ec_elgamal_results[k][j][3], ec_elgamal_results[k][j][4],
+                       ec_elgamal_results[k][j][5]);
+        }
+    }
+# endif
+
 #endif
 
     ret = 0;
@@ -3793,6 +4225,30 @@ int speed_main(int argc, char **argv)
             EVP_MD_CTX_free(loopargs[i].sm2_vfy_ctx[k]);
             /* free pkey */
             EVP_PKEY_free(loopargs[i].sm2_pkey[k]);
+        }
+# endif
+# ifndef OPENSSL_NO_EC_ELGAMAL
+        for (k = 0; k < EC_ELGAMAL_NUM; k++) {
+            if (loopargs[i].decrypt_table[k][0] != NULL)
+                EC_ELGAMAL_DECRYPT_TABLE_free(loopargs[i].decrypt_table[k][0]);
+
+            if (loopargs[i].decrypt_table[k][1] != NULL)
+                EC_ELGAMAL_DECRYPT_TABLE_free(loopargs[i].decrypt_table[k][1]);
+
+            if (loopargs[i].ciphertext_a[k] != NULL)
+                EC_ELGAMAL_CIPHERTEXT_free(loopargs[i].ciphertext_a[k]);
+
+            if (loopargs[i].ciphertext_b[k] != NULL)
+                EC_ELGAMAL_CIPHERTEXT_free(loopargs[i].ciphertext_b[k]);
+
+            if (loopargs[i].ciphertext_r[k] != NULL)
+                EC_ELGAMAL_CIPHERTEXT_free(loopargs[i].ciphertext_r[k]);
+
+            if (loopargs[i].ec_elgamal_key[k] != NULL)
+                EC_KEY_free(loopargs[i].ec_elgamal_key[k]);
+
+            if (loopargs[i].ec_elgamal_ctx[k] != NULL)
+                EC_ELGAMAL_CTX_free(loopargs[i].ec_elgamal_ctx[k]);
         }
 # endif
         OPENSSL_free(loopargs[i].secret_a);
@@ -3859,6 +4315,28 @@ static void print_result(int alg, int run_no, int count, double time_used)
                : "%d %s's in %.2fs\n", count, names[alg], time_used);
     results[alg][run_no] = ((double)count) / time_used * lengths[run_no];
 }
+
+#ifndef OPENSSL_NO_EC_ELGAMAL
+static void ec_elgamal_print_message(const char *str, const char *str2,
+                                     long num, int tm)
+{
+# ifdef SIGALRM
+    BIO_printf(bio_err,
+               mr ? "+DTP:%s:%s:%d\n"
+               : "Doing ec_elgamal %s with curve %s for %ds: ",
+               str, str2, tm);
+    (void)BIO_flush(bio_err);
+    run = 1;
+    alarm(tm);
+# else
+    BIO_printf(bio_err,
+               mr ? "+DTP:%s:%s:%d\n"
+               : "Doing ec_elgamal %s with curve %s for %ld times: ",
+               str, str2, num);
+    (void)BIO_flush(bio_err);
+# endif
+}
+#endif
 
 #ifndef NO_FORK
 static char *sstrsep(char **string, const char *delim)
@@ -4036,6 +4514,48 @@ static int do_multi(int multi, int size_num)
                 sm2_results[k][1] += d;
             }
 #  endif /* OPENSSL_NO_SM2 */
+#  ifndef OPENSSL_NO_EC_ELGAMAL
+            else if (strncmp(buf, "+F8:", 4) == 0) {
+                int k;
+                double d;
+
+                p = buf + 4;
+                k = atoi(sstrsep(&p, sep));
+                sstrsep(&p, sep);
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][0][0] += d;
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][1][0] += d;
+            }
+            else if (strncmp(buf, "+F9:", 4) == 0) {
+                int k, j;
+                double d;
+
+                p = buf + 4;
+                k = atoi(sstrsep(&p, sep));
+                j = atoi(sstrsep(&p, sep));
+                sstrsep(&p, sep);
+                sstrsep(&p, sep);
+                sstrsep(&p, sep);
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][j][1] += d;
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][j][2] += d;
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][j][3] += d;
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][j][4] += d;
+
+                d = atof(sstrsep(&p, sep));
+                ec_elgamal_results[k][j][5] += d;
+            }
+#  endif /* OPENSSL_NO_EC_ELGAMAL */
 # endif
 
             else if (strncmp(buf, "+H:", 3) == 0) {

@@ -534,11 +534,6 @@
 #define NID_rsaEncryption               6
 #define OBJ_rsaEncryption               OBJ_pkcs1,1L
 
-#define SN_md2WithRSAEncryption         "RSA-MD2"
-#define LN_md2WithRSAEncryption         "md2WithRSAEncryption"
-#define NID_md2WithRSAEncryption                7
-#define OBJ_md2WithRSAEncryption                OBJ_pkcs1,2L
-
 #define SN_md4WithRSAEncryption         "RSA-MD4"
 #define LN_md4WithRSAEncryption         "md4WithRSAEncryption"
 #define NID_md4WithRSAEncryption                396
@@ -616,20 +611,10 @@
 #define NID_pkcs5               187
 #define OBJ_pkcs5               OBJ_pkcs,5L
 
-#define SN_pbeWithMD2AndDES_CBC         "PBE-MD2-DES"
-#define LN_pbeWithMD2AndDES_CBC         "pbeWithMD2AndDES-CBC"
-#define NID_pbeWithMD2AndDES_CBC                9
-#define OBJ_pbeWithMD2AndDES_CBC                OBJ_pkcs5,1L
-
 #define SN_pbeWithMD5AndDES_CBC         "PBE-MD5-DES"
 #define LN_pbeWithMD5AndDES_CBC         "pbeWithMD5AndDES-CBC"
 #define NID_pbeWithMD5AndDES_CBC                10
 #define OBJ_pbeWithMD5AndDES_CBC                OBJ_pkcs5,3L
-
-#define SN_pbeWithMD2AndRC2_CBC         "PBE-MD2-RC2-64"
-#define LN_pbeWithMD2AndRC2_CBC         "pbeWithMD2AndRC2-CBC"
-#define NID_pbeWithMD2AndRC2_CBC                168
-#define OBJ_pbeWithMD2AndRC2_CBC                OBJ_pkcs5,4L
 
 #define SN_pbeWithMD5AndRC2_CBC         "PBE-MD5-RC2-64"
 #define LN_pbeWithMD5AndRC2_CBC         "pbeWithMD5AndRC2-CBC"
@@ -1136,11 +1121,6 @@
 #define LN_safeContentsBag              "safeContentsBag"
 #define NID_safeContentsBag             155
 #define OBJ_safeContentsBag             OBJ_pkcs12_BagIds,6L
-
-#define SN_md2          "MD2"
-#define LN_md2          "md2"
-#define NID_md2         3
-#define OBJ_md2         OBJ_rsadsi,2L,2L
 
 #define SN_md4          "MD4"
 #define LN_md4          "md4"
@@ -4440,191 +4420,6 @@
 
 #define SN_magma_mac            "magma-mac"
 #define NID_magma_mac           1192
-
-#define SN_camellia_128_cbc             "CAMELLIA-128-CBC"
-#define LN_camellia_128_cbc             "camellia-128-cbc"
-#define NID_camellia_128_cbc            751
-#define OBJ_camellia_128_cbc            1L,2L,392L,200011L,61L,1L,1L,1L,2L
-
-#define SN_camellia_192_cbc             "CAMELLIA-192-CBC"
-#define LN_camellia_192_cbc             "camellia-192-cbc"
-#define NID_camellia_192_cbc            752
-#define OBJ_camellia_192_cbc            1L,2L,392L,200011L,61L,1L,1L,1L,3L
-
-#define SN_camellia_256_cbc             "CAMELLIA-256-CBC"
-#define LN_camellia_256_cbc             "camellia-256-cbc"
-#define NID_camellia_256_cbc            753
-#define OBJ_camellia_256_cbc            1L,2L,392L,200011L,61L,1L,1L,1L,4L
-
-#define SN_id_camellia128_wrap          "id-camellia128-wrap"
-#define NID_id_camellia128_wrap         907
-#define OBJ_id_camellia128_wrap         1L,2L,392L,200011L,61L,1L,1L,3L,2L
-
-#define SN_id_camellia192_wrap          "id-camellia192-wrap"
-#define NID_id_camellia192_wrap         908
-#define OBJ_id_camellia192_wrap         1L,2L,392L,200011L,61L,1L,1L,3L,3L
-
-#define SN_id_camellia256_wrap          "id-camellia256-wrap"
-#define NID_id_camellia256_wrap         909
-#define OBJ_id_camellia256_wrap         1L,2L,392L,200011L,61L,1L,1L,3L,4L
-
-#define OBJ_ntt_ds              0L,3L,4401L,5L
-
-#define OBJ_camellia            OBJ_ntt_ds,3L,1L,9L
-
-#define SN_camellia_128_ecb             "CAMELLIA-128-ECB"
-#define LN_camellia_128_ecb             "camellia-128-ecb"
-#define NID_camellia_128_ecb            754
-#define OBJ_camellia_128_ecb            OBJ_camellia,1L
-
-#define SN_camellia_128_ofb128          "CAMELLIA-128-OFB"
-#define LN_camellia_128_ofb128          "camellia-128-ofb"
-#define NID_camellia_128_ofb128         766
-#define OBJ_camellia_128_ofb128         OBJ_camellia,3L
-
-#define SN_camellia_128_cfb128          "CAMELLIA-128-CFB"
-#define LN_camellia_128_cfb128          "camellia-128-cfb"
-#define NID_camellia_128_cfb128         757
-#define OBJ_camellia_128_cfb128         OBJ_camellia,4L
-
-#define SN_camellia_128_gcm             "CAMELLIA-128-GCM"
-#define LN_camellia_128_gcm             "camellia-128-gcm"
-#define NID_camellia_128_gcm            961
-#define OBJ_camellia_128_gcm            OBJ_camellia,6L
-
-#define SN_camellia_128_ccm             "CAMELLIA-128-CCM"
-#define LN_camellia_128_ccm             "camellia-128-ccm"
-#define NID_camellia_128_ccm            962
-#define OBJ_camellia_128_ccm            OBJ_camellia,7L
-
-#define SN_camellia_128_ctr             "CAMELLIA-128-CTR"
-#define LN_camellia_128_ctr             "camellia-128-ctr"
-#define NID_camellia_128_ctr            963
-#define OBJ_camellia_128_ctr            OBJ_camellia,9L
-
-#define SN_camellia_128_cmac            "CAMELLIA-128-CMAC"
-#define LN_camellia_128_cmac            "camellia-128-cmac"
-#define NID_camellia_128_cmac           964
-#define OBJ_camellia_128_cmac           OBJ_camellia,10L
-
-#define SN_camellia_192_ecb             "CAMELLIA-192-ECB"
-#define LN_camellia_192_ecb             "camellia-192-ecb"
-#define NID_camellia_192_ecb            755
-#define OBJ_camellia_192_ecb            OBJ_camellia,21L
-
-#define SN_camellia_192_ofb128          "CAMELLIA-192-OFB"
-#define LN_camellia_192_ofb128          "camellia-192-ofb"
-#define NID_camellia_192_ofb128         767
-#define OBJ_camellia_192_ofb128         OBJ_camellia,23L
-
-#define SN_camellia_192_cfb128          "CAMELLIA-192-CFB"
-#define LN_camellia_192_cfb128          "camellia-192-cfb"
-#define NID_camellia_192_cfb128         758
-#define OBJ_camellia_192_cfb128         OBJ_camellia,24L
-
-#define SN_camellia_192_gcm             "CAMELLIA-192-GCM"
-#define LN_camellia_192_gcm             "camellia-192-gcm"
-#define NID_camellia_192_gcm            965
-#define OBJ_camellia_192_gcm            OBJ_camellia,26L
-
-#define SN_camellia_192_ccm             "CAMELLIA-192-CCM"
-#define LN_camellia_192_ccm             "camellia-192-ccm"
-#define NID_camellia_192_ccm            966
-#define OBJ_camellia_192_ccm            OBJ_camellia,27L
-
-#define SN_camellia_192_ctr             "CAMELLIA-192-CTR"
-#define LN_camellia_192_ctr             "camellia-192-ctr"
-#define NID_camellia_192_ctr            967
-#define OBJ_camellia_192_ctr            OBJ_camellia,29L
-
-#define SN_camellia_192_cmac            "CAMELLIA-192-CMAC"
-#define LN_camellia_192_cmac            "camellia-192-cmac"
-#define NID_camellia_192_cmac           968
-#define OBJ_camellia_192_cmac           OBJ_camellia,30L
-
-#define SN_camellia_256_ecb             "CAMELLIA-256-ECB"
-#define LN_camellia_256_ecb             "camellia-256-ecb"
-#define NID_camellia_256_ecb            756
-#define OBJ_camellia_256_ecb            OBJ_camellia,41L
-
-#define SN_camellia_256_ofb128          "CAMELLIA-256-OFB"
-#define LN_camellia_256_ofb128          "camellia-256-ofb"
-#define NID_camellia_256_ofb128         768
-#define OBJ_camellia_256_ofb128         OBJ_camellia,43L
-
-#define SN_camellia_256_cfb128          "CAMELLIA-256-CFB"
-#define LN_camellia_256_cfb128          "camellia-256-cfb"
-#define NID_camellia_256_cfb128         759
-#define OBJ_camellia_256_cfb128         OBJ_camellia,44L
-
-#define SN_camellia_256_gcm             "CAMELLIA-256-GCM"
-#define LN_camellia_256_gcm             "camellia-256-gcm"
-#define NID_camellia_256_gcm            969
-#define OBJ_camellia_256_gcm            OBJ_camellia,46L
-
-#define SN_camellia_256_ccm             "CAMELLIA-256-CCM"
-#define LN_camellia_256_ccm             "camellia-256-ccm"
-#define NID_camellia_256_ccm            970
-#define OBJ_camellia_256_ccm            OBJ_camellia,47L
-
-#define SN_camellia_256_ctr             "CAMELLIA-256-CTR"
-#define LN_camellia_256_ctr             "camellia-256-ctr"
-#define NID_camellia_256_ctr            971
-#define OBJ_camellia_256_ctr            OBJ_camellia,49L
-
-#define SN_camellia_256_cmac            "CAMELLIA-256-CMAC"
-#define LN_camellia_256_cmac            "camellia-256-cmac"
-#define NID_camellia_256_cmac           972
-#define OBJ_camellia_256_cmac           OBJ_camellia,50L
-
-#define SN_camellia_128_cfb1            "CAMELLIA-128-CFB1"
-#define LN_camellia_128_cfb1            "camellia-128-cfb1"
-#define NID_camellia_128_cfb1           760
-
-#define SN_camellia_192_cfb1            "CAMELLIA-192-CFB1"
-#define LN_camellia_192_cfb1            "camellia-192-cfb1"
-#define NID_camellia_192_cfb1           761
-
-#define SN_camellia_256_cfb1            "CAMELLIA-256-CFB1"
-#define LN_camellia_256_cfb1            "camellia-256-cfb1"
-#define NID_camellia_256_cfb1           762
-
-#define SN_camellia_128_cfb8            "CAMELLIA-128-CFB8"
-#define LN_camellia_128_cfb8            "camellia-128-cfb8"
-#define NID_camellia_128_cfb8           763
-
-#define SN_camellia_192_cfb8            "CAMELLIA-192-CFB8"
-#define LN_camellia_192_cfb8            "camellia-192-cfb8"
-#define NID_camellia_192_cfb8           764
-
-#define SN_camellia_256_cfb8            "CAMELLIA-256-CFB8"
-#define LN_camellia_256_cfb8            "camellia-256-cfb8"
-#define NID_camellia_256_cfb8           765
-
-#define SN_kisa         "KISA"
-#define LN_kisa         "kisa"
-#define NID_kisa                773
-#define OBJ_kisa                OBJ_member_body,410L,200004L
-
-#define SN_seed_ecb             "SEED-ECB"
-#define LN_seed_ecb             "seed-ecb"
-#define NID_seed_ecb            776
-#define OBJ_seed_ecb            OBJ_kisa,1L,3L
-
-#define SN_seed_cbc             "SEED-CBC"
-#define LN_seed_cbc             "seed-cbc"
-#define NID_seed_cbc            777
-#define OBJ_seed_cbc            OBJ_kisa,1L,4L
-
-#define SN_seed_cfb128          "SEED-CFB"
-#define LN_seed_cfb128          "seed-cfb"
-#define NID_seed_cfb128         779
-#define OBJ_seed_cfb128         OBJ_kisa,1L,5L
-
-#define SN_seed_ofb128          "SEED-OFB"
-#define LN_seed_ofb128          "seed-ofb"
-#define NID_seed_ofb128         778
-#define OBJ_seed_ofb128         OBJ_kisa,1L,6L
 
 #define SN_sm4_ecb              "SM4-ECB"
 #define LN_sm4_ecb              "sm4-ecb"

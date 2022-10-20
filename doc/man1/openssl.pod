@@ -300,10 +300,6 @@ BLAKE2b-512 Digest
 
 BLAKE2s-256 Digest
 
-=item B<md2>
-
-MD2 Digest
-
 =item B<md4>
 
 MD4 Digest
@@ -400,18 +396,6 @@ Base64 Encoding
 
 Blowfish Cipher
 
-=item B<camellia128>, B<camellia-128-cbc>, B<camellia-128-cfb>, B<camellia-128-ctr>, B<camellia-128-ecb>, B<camellia-128-ofb>
-
-Camellia-128 Cipher
-
-=item B<camellia192>, B<camellia-192-cbc>, B<camellia-192-cfb>, B<camellia-192-ctr>, B<camellia-192-ecb>, B<camellia-192-ofb>
-
-Camellia-192 Cipher
-
-=item B<camellia256>, B<camellia-256-cbc>, B<camellia-256-cfb>, B<camellia-256-ctr>, B<camellia-256-ecb>, B<camellia-256-ofb>
-
-Camellia-256 Cipher
-
 =item B<cast>, B<cast-cbc>
 
 CAST Cipher
@@ -449,10 +433,6 @@ RC4 Cipher
 RC5 Cipher
 
 =item B<seed>, B<seed-cbc>, B<seed-cfb>, B<seed-ecb>, B<seed-ofb>
-
-SEED Cipher
-
-=item B<sm4>, B<sm4-cbc>, B<sm4-cfb>, B<sm4-ctr>, B<sm4-ecb>, B<sm4-ofb>
 
 SM4 Cipher
 
